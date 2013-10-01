@@ -45,6 +45,7 @@ size_t job_data_size_limit = JOB_DATA_SIZE_LIMIT_DEFAULT;
 #define CMD_LIST_TUBE_USED "list-tube-used"
 #define CMD_LIST_TUBES_WATCHED "list-tubes-watched"
 #define CMD_STATS_TUBE "stats-tube "
+#define CMD_CLEAR_TUBE "clear-tube "
 #define CMD_QUIT "quit"
 #define CMD_PAUSE_TUBE "pause-tube"
 
@@ -71,6 +72,7 @@ size_t job_data_size_limit = JOB_DATA_SIZE_LIMIT_DEFAULT;
 #define CMD_LIST_TUBE_USED_LEN CONSTSTRLEN(CMD_LIST_TUBE_USED)
 #define CMD_LIST_TUBES_WATCHED_LEN CONSTSTRLEN(CMD_LIST_TUBES_WATCHED)
 #define CMD_STATS_TUBE_LEN CONSTSTRLEN(CMD_STATS_TUBE)
+#define CMD_CLEAR_TUBE_LEN CONSTSTRLEN(CMD_CLEAR_TUBE)
 #define CMD_PAUSE_TUBE_LEN CONSTSTRLEN(CMD_PAUSE_TUBE)
 
 #define MSG_FOUND "FOUND"
@@ -82,6 +84,7 @@ size_t job_data_size_limit = JOB_DATA_SIZE_LIMIT_DEFAULT;
 #define MSG_RELEASED "RELEASED\r\n"
 #define MSG_BURIED "BURIED\r\n"
 #define MSG_KICKED "KICKED\r\n"
+#define MSG_CLEARED "CLEARED\r\n"
 #define MSG_TOUCHED "TOUCHED\r\n"
 #define MSG_BURIED_FMT "BURIED %"PRIu64"\r\n"
 #define MSG_INSERTED_FMT "INSERTED %"PRIu64"\r\n"
@@ -136,7 +139,8 @@ size_t job_data_size_limit = JOB_DATA_SIZE_LIMIT_DEFAULT;
 #define OP_QUIT 22
 #define OP_PAUSE_TUBE 23
 #define OP_JOBKICK 24
-#define TOTAL_OPS 25
+#define OP_CLEAR_TUBE 25
+#define TOTAL_OPS 26
 
 #define STATS_FMT "---\n" \
     "current-jobs-urgent: %u\n" \
@@ -166,6 +170,7 @@ size_t job_data_size_limit = JOB_DATA_SIZE_LIMIT_DEFAULT;
     "cmd-list-tube-used: %" PRIu64 "\n" \
     "cmd-list-tubes-watched: %" PRIu64 "\n" \
     "cmd-pause-tube: %" PRIu64 "\n" \
+    "cmd-clear-tube: %" PRIu64 "\n" \
     "job-timeouts: %" PRIu64 "\n" \
     "total-jobs: %" PRIu64 "\n" \
     "max-job-size: %zu\n" \
@@ -273,6 +278,7 @@ static const char * op_names[] = {
     CMD_QUIT,
     CMD_PAUSE_TUBE,
     CMD_JOBKICK,
+    CMD_CLEAR_TUBE,
 };
 
 static job remove_buried_job(job j);
@@ -763,6 +769,7 @@ which_cmd(Conn *c)
     TEST_CMD(c->cmd, CMD_LIST_TUBES, OP_LIST_TUBES);
     TEST_CMD(c->cmd, CMD_QUIT, OP_QUIT);
     TEST_CMD(c->cmd, CMD_PAUSE_TUBE, OP_PAUSE_TUBE);
+    TEST_CMD(c->cmd, CMD_CLEAR_TUBE, OP_CLEAR_TUBE);
     return OP_UNKNOWN;
 }
 
@@ -912,6 +919,7 @@ fmt_stats(char *buf, size_t size, void *x)
             op_ct[OP_LIST_TUBE_USED],
             op_ct[OP_LIST_TUBES_WATCHED],
             op_ct[OP_PAUSE_TUBE],
+            op_ct[OP_CLEAR_TUBE],
             timeout_ct,
             global_stat.total_jobs_ct,
             job_data_size_limit,
@@ -1597,6 +1605,21 @@ dispatch_cmd(Conn *c)
 
         reply_line(c, STATE_SENDWORD, "PAUSED\r\n");
         break;
+    case OP_CLEAR_TUBE:
+    	name = c->cmd + CMD_CLEAR_TUBE_LEN;
+    	if (!name_is_ok(name, 200)) return reply_msg(c, MSG_BAD_FORMAT);
+
+    	t = tube_find(name);
+    	if (!t) return reply_msg(c, MSG_NOTFOUND);
+
+    	tube_clear(t);
+
+    	op_ct[type]++;
+
+    	reply_msg(c,  MSG_CLEARED);
+
+    	t = NULL;
+    	break;
     default:
         return reply_msg(c, MSG_UNKNOWN_COMMAND);
     }
@@ -1901,6 +1924,7 @@ prottick(Server *s)
     }
 
     update_conns();
+    tube_empty_trash();
 
     return period;
 }
