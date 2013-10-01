@@ -8,6 +8,7 @@
 #include <pwd.h>
 #include <fcntl.h>
 #include "dat.h"
+//#include "sd-daemon.h"
 
 static void
 su(const char *user) {
@@ -60,9 +61,15 @@ main(int argc, char **argv)
         printf("pid %d\n", getpid());
     }
 
-    r = make_server_socket(srv.addr, srv.port);
-    if (r == -1) twarnx("make_server_socket()"), exit(111);
-    srv.sock.fd = r;
+    if (srv.path) {
+    	r = make_local_socket(srv.path);
+    	if (r == -1) twarnx("make_local_socket()"), exit(111);
+    	srv.local.fd = r;
+    } else {
+    	r = make_inet_socket(srv.addr, srv.port);
+    	if (r == -1) twarnx("make_inet_socket()"), exit(111);
+    	srv.inet.fd = r;
+    }
 
     prot_init();
 

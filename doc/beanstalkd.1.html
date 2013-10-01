@@ -119,15 +119,24 @@ it writes to the binlog.</p>
 
 <p>(This option has no effect without <code>-b</code>.)</p></dd>
 <dt class="flush"><code>-h</code></dt><dd><p>Show a brief help message and exit.</p></dd>
-<dt class="flush"><code>-l</code> <var>addr</var></dt><dd><p>Listen on address <var>addr</var> (default is 0.0.0.0).</p>
+<dt class="flush"><code>-l</code> <var>addr</var></dt><dd><p>Listen on address <var>addr</var> (default is 0.0.0.0 except when local bind is
+specified, see the help of <code>-L</code>.)</p>
 
 <p>(Option <code>-l</code> has no effect if <span class="man-ref">sd-daemon<span class="s">(5)</span></span> socket activation is
+being used. See also <a href="#ENVIRONMENT" title="ENVIRONMENT" data-bare-link="true">ENVIRONMENT</a>.)</p></dd>
+<dt class="flush"><code>-L</code> <var>path</var></dt><dd><p>Create local socket at <var>path</var> and accept connections from it. The
+use of this option disables the default behaviour of <code>-l</code>. In other
+words, <code>-L</code> clears the default value of <code>-l</code> and no TCP port is
+opened unless <code>-l</code> is explicitly used.</p>
+
+<p>(Option <code>-L</code> has no effect if <span class="man-ref">sd-daemon<span class="s">(5)</span></span> socket activation is
 being used. See also <a href="#ENVIRONMENT" title="ENVIRONMENT" data-bare-link="true">ENVIRONMENT</a>.)</p></dd>
 <dt class="flush"><code>-n</code></dt><dd><p>Turn off binlog compaction, negating <code>-c</code>.</p>
 
 <p>(Do not use this option. Both <code>-c</code> and <code>-n</code> will likely be removed
 in a future <code>beanstalkd</code> release.)</p></dd>
-<dt class="flush"><code>-p</code> <var>port</var></dt><dd><p>Listen on TCP port <var>port</var> (default is 11300).</p>
+<dt class="flush"><code>-p</code> <var>port</var></dt><dd><p>Listen on TCP port <var>port</var> (default is 11300). This option is ignored
+when <code>-L</code> is used but <code>-l</code> is not.</p>
 
 <p>(Option <code>-p</code> has no effect if <span class="man-ref">sd-daemon<span class="s">(5)</span></span> socket activation is
 being used. See also <a href="#ENVIRONMENT" title="ENVIRONMENT" data-bare-link="true">ENVIRONMENT</a>.)</p></dd>
@@ -167,7 +176,7 @@ of many others.</p>
 
   <ol class='man-decor man-foot man foot'>
     <li class='tl'></li>
-    <li class='tc'>April 2012</li>
+    <li class='tc'>April 2013</li>
     <li class='tr'>beanstalkd(1)</li>
   </ol>
 

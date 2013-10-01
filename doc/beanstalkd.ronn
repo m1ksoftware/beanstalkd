@@ -57,9 +57,19 @@ and format of the `beanstalkd` protocol.
   Show a brief help message and exit.
 
 * `-l` <addr>:
-  Listen on address <addr> (default is 0.0.0.0).
+  Listen on address <addr> (default is 0.0.0.0 except when local bind is
+  specified, see the help of `-L`.)
 
   (Option `-l` has no effect if sd-daemon(5) socket activation is
+  being used. See also [ENVIRONMENT][].)
+
+* `-L` <path>:
+  Create local socket at <path> and accept connections from it. The
+  use of this option disables the default behaviour of `-l`. In other
+  words, `-L` clears the default value of `-l` and no TCP port is
+  opened unless `-l` is explicitly used.
+
+  (Option `-L` has no effect if sd-daemon(5) socket activation is
   being used. See also [ENVIRONMENT][].)
 
 * `-n`:
@@ -69,7 +79,8 @@ and format of the `beanstalkd` protocol.
   in a future `beanstalkd` release.)
 
 * `-p` <port>:
-  Listen on TCP port <port> (default is 11300).
+  Listen on TCP port <port> (default is 11300). This option is ignored
+  when `-L` is used but `-l` is not.
 
   (Option `-p` has no effect if sd-daemon(5) socket activation is
   being used. See also [ENVIRONMENT][].)

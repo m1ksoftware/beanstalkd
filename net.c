@@ -5,13 +5,136 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/stat.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include "dat.h"
 #include "sd-daemon.h"
 
+/*
+ * See if we got a listen fd from systemd. If so, all socket options etc are
+ * already set, so we check that the fd is a TCP or UNIX listen socket and
+ * return.  The parameter determines if we want a UNIX (check_local true) or a
+ * TCP (check_local false) socket from systemd.
+ */
+static int
+try_systemd_socket(char check_local)
+{
+    int r, last, fd;
+
+    r = sd_listen_fds(0);
+    if (r < 0) {
+        return twarn("getaddrinfo()"), -1;
+    } else if (r == 0) {
+        return 0;
+    }
+
+    if (r > 2) {
+        twarnx("inherited mor than one listen socket;"
+               " ignoring all but the first two");
+        r = 2;
+    }
+    last = SD_LISTEN_FDS_START + r;
+    for (fd = SD_LISTEN_FDS_START; fd < last; fd++) {
+        if (check_local) {
+            r = sd_is_socket_unix(fd, SOCK_STREAM, 1, NULL, 0);
+        } else {
+            r = sd_is_socket_inet(fd, 0, SOCK_STREAM, 1, 0);
+        }
+        if (r < 0) {
+            errno = -r;
+            twarn("sd_is_socket_%s", check_local ? "unix" : "inet");
+        }
+        if (r) {
+            return fd;
+        }
+    }
+    twarnx("none of the inherited fds is usable");
+    return -1;
+}
+
+static int
+set_nonblocking(int fd)
+{
+    int flags, r;
+
+    flags = fcntl(fd, F_GETFL, 0);
+    if (flags < 0) {
+        twarn("getting flags");
+        return -1;
+    }
+    r = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+    if (r == -1) {
+        twarn("setting O_NONBLOCK");
+        return -1;
+    }
+    return 0;
+}
+
 int
-make_server_socket(char *host, char *port)
+make_local_socket(char *path)
+{
+    int fd = -1, r;
+    struct stat st;
+    struct sockaddr_un addr;
+
+    fd = try_systemd_socket(1);
+    if (fd) {
+        return fd;
+    }
+
+    r = stat(path, &st);
+    if (r == 0) {
+        if (S_ISSOCK(st.st_mode)) {
+            warnx("removing existing local socket to replace it");
+            r = unlink(path);
+            if (r == -1) {
+                twarn("unlink");
+                return -1;
+            }
+        } else {
+            warnx("another file already exists in the given path");
+            return -1;
+        }
+    }
+
+    fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd == -1) {
+        twarn("socket()");
+        return -1;
+    }
+
+    r = set_nonblocking(fd);
+    if (r == -1) {
+        close(fd);
+        return -1;
+    }
+
+    if (verbose) {
+        printf("bind %s\n", path);
+    }
+    addr.sun_family = AF_UNIX;
+    strcpy(addr.sun_path, path);  // length is safe, checked earlier
+    r = bind(fd, (struct sockaddr *) &addr, sizeof(struct sockaddr_un));
+    if (r == -1) {
+        twarn("bind()");
+        close(fd);
+        return -1;
+    }
+
+    r = listen(fd, 1024);
+    if (r == -1) {
+        twarn("listen()");
+        close(fd);
+        return -1;
+    }
+
+    return fd;
+}
+
+int
+make_inet_socket(char *host, char *port)
 {
     int fd = -1, flags, r;
     struct linger linger = {0, 0};

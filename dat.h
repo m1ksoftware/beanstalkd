@@ -260,9 +260,8 @@ void h_accept(const int fd, const short which, Server* srv);
 void prot_remove_tube(tube t);
 int  prot_replay(Server *s, job list);
 
-
-int make_server_socket(char *host_addr, char *port);
-
+int make_inet_socket(char *host_addr, char *port);
+int make_local_socket(char *path);
 
 struct Conn {
     Server *srv;
@@ -379,10 +378,13 @@ struct Server {
     char *port;
     char *addr;
     char *user;
+    char *path;
 
     Wal    wal;
-    Socket sock;
+    Socket inet;
+    Socket local;
     Heap   conns;
 };
 void srvserve(Server *srv);
-void srvaccept(Server *s, int ev);
+void srvaccept_inet(Server *s, int ev);
+void srvaccept_local(Server *s, int ev);
