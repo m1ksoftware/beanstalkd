@@ -277,6 +277,7 @@ static const char * op_names[] = {
     CMD_QUIT,
     CMD_PAUSE_TUBE,
     CMD_JOBKICK,
+    CMD_CLEAR_TUBE,
 };
 
 static job remove_buried_job(job j);
@@ -767,6 +768,7 @@ which_cmd(Conn *c)
     TEST_CMD(c->cmd, CMD_LIST_TUBES, OP_LIST_TUBES);
     TEST_CMD(c->cmd, CMD_QUIT, OP_QUIT);
     TEST_CMD(c->cmd, CMD_PAUSE_TUBE, OP_PAUSE_TUBE);
+    TEST_CMD(c->cmd, CMD_CLEAR_TUBE, OP_CLEAR_TUBE);
     return OP_UNKNOWN;
 }
 
