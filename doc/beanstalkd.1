@@ -1,7 +1,7 @@
 .\" generated with Ronn/v0.7.3
 .\" http://github.com/rtomayko/ronn/tree/0.7.3
 .
-.TH "BEANSTALKD" "1" "April 2012" "" ""
+.TH "BEANSTALKD" "1" "April 2013" "" ""
 .
 .SH "NAME"
 \fBbeanstalkd\fR \- simple, fast work queue
@@ -54,10 +54,17 @@ Show a brief help message and exit\.
 .
 .TP
 \fB\-l\fR \fIaddr\fR
-Listen on address \fIaddr\fR (default is 0\.0\.0\.0)\.
+Listen on address \fIaddr\fR (default is 0\.0\.0\.0 except when local bind is specified, see the help of \fB\-L\fR\.)
 .
 .IP
 (Option \fB\-l\fR has no effect if sd\-daemon(5) socket activation is being used\. See also \fIENVIRONMENT\fR\.)
+.
+.TP
+\fB\-L\fR \fIpath\fR
+Create local socket at \fIpath\fR and accept connections from it\. The use of this option disables the default behaviour of \fB\-l\fR\. In other words, \fB\-L\fR clears the default value of \fB\-l\fR and no TCP port is opened unless \fB\-l\fR is explicitly used\.
+.
+.IP
+(Option \fB\-L\fR has no effect if sd\-daemon(5) socket activation is being used\. See also \fIENVIRONMENT\fR\.)
 .
 .TP
 \fB\-n\fR
@@ -68,7 +75,7 @@ Turn off binlog compaction, negating \fB\-c\fR\.
 .
 .TP
 \fB\-p\fR \fIport\fR
-Listen on TCP port \fIport\fR (default is 11300)\.
+Listen on TCP port \fIport\fR (default is 11300)\. This option is ignored when \fB\-L\fR is used but \fB\-l\fR is not\.
 .
 .IP
 (Option \fB\-p\fR has no effect if sd\-daemon(5) socket activation is being used\. See also \fIENVIRONMENT\fR\.)

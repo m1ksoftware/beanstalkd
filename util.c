@@ -104,6 +104,7 @@ usage(int code)
                        " (use -f0 for \"always fsync\")\n"
             " -F       never fsync (default)\n"
             " -l ADDR  listen on address (default is 0.0.0.0)\n"
+    		" -L PATH  listen on unix socket\n"
             " -p PORT  listen on port (default is " Portdef ")\n"
             " -u USER  become user and group\n"
             " -z BYTES set the maximum job size in bytes (default is %d)\n"
@@ -161,6 +162,14 @@ optparse(Server *s, char **argv)
                     s->addr = EARGF(flagusage("-l"));
                     warn_systemd_ignored_option("-l", s->addr);
                     break;
+                case 'L':
+                	s->path = EARGF(flagusage("-L"));
+                	warn_systemd_ignored_option("-L", s->path);
+                	if (strlen(s->path) > 100) {
+                		warnx("local socket path is longer than 100 bytes");
+                		exit(1);
+                	}
+                	break;
                 case 'z':
                     job_data_size_limit = parse_size_t(EARGF(flagusage("-z")));
                     break;

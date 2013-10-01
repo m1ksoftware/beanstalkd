@@ -7,6 +7,7 @@ struct Server srv = {
     Portdef,
     NULL,
     NULL,
+    NULL,
     {
         Filesizedef,
     },
@@ -25,23 +26,28 @@ srvserve(Server *s)
         exit(1);
     }
 
-    s->sock.x = s;
-    s->sock.f = (Handle)srvaccept;
+    s->inet.x = s;
+    s->inet.f = (Handle)srvaccept_inet;
+    s->local.x = s;
+    s->local.f = (Handle)srvaccept_local;
     s->conns.less = (Less)connless;
     s->conns.rec = (Record)connrec;
 
-    r = listen(s->sock.fd, 1024);
-    if (r == -1) {
-        twarn("listen");
-        return;
+    if (s->local.fd > 0) {
+    	r = sockwant(&s->local, 'r');
+    	if (r == -1) {
+    		twarn("socwant local");
+    		exit(2);
+    	}
     }
 
-    r = sockwant(&s->sock, 'r');
-    if (r == -1) {
-        twarn("sockwant");
-        exit(2);
+    if (s->inet.fd > 0) {
+    	r = sockwant(&s->inet, 'r');
+    	if (r == -1) {
+    		twarn("socwant inet");
+    		exit(2);
+    	}
     }
-
 
     for (;;) {
         period = prottick(s);
@@ -60,7 +66,13 @@ srvserve(Server *s)
 
 
 void
-srvaccept(Server *s, int ev)
+srvaccept_inet(Server *s, int ev)
 {
-    h_accept(s->sock.fd, ev, s);
+    h_accept(s->inet.fd, ev, s);
+}
+
+void
+srvaccept_local(Server *s, int ev)
+{
+        h_accept(s->local.fd, ev, s);
 }
