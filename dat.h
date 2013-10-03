@@ -295,7 +295,7 @@ struct Conn {
     job in_job; // a job to be read from the client
 
     job out_job;
-    int tot_data_to_sent;
+    int job_sent;
     int out_job_sent;
     int out_tubename_sent;
     int out_extra_sent;

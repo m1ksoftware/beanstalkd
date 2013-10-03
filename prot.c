@@ -359,12 +359,10 @@ reply_job(Conn *c, job j, const char *word)
     /* tell this connection which job to send */
     c->out_job = j;
 
+    c->job_sent = 0;
     c->out_job_sent = 0;
     c->out_tubename_sent = 0;
     c->out_extra_sent = 0;
-
-    // Tot data to sent
-    c->tot_data_to_sent = c->reply_len + j->r.body_size + j->tube->name_size + 2;
 
     return reply_line(c, STATE_SENDJOB, "%s %"PRIu64" %u %lu\r\n",
                       word, j->r.id, j->r.body_size - 2, strlen(j->tube->name));
@@ -1821,6 +1819,7 @@ conn_data(Conn *c)
             	if (c->out_tubename_sent >= j->tube->name_size) {
             		c->out_extra_sent = c->out_tubename_sent - j->tube->name_size;
             		c->out_tubename_sent = j->tube->name_size;
+            		c->job_sent = 1;
             	}
             }
         }
@@ -1828,7 +1827,7 @@ conn_data(Conn *c)
         /* (c->out_job_sent > j->r.body_size) can't happen */
 
         /* are we done? */
-        if (c->reply_sent == c->tot_data_to_sent) {
+        if (c->job_sent) {
             if (verbose >= 2) {
                 printf(">%d job %"PRIu64"\n", c->sock.fd, j->r.id);
             }
