@@ -156,6 +156,7 @@ struct job {
 struct tube {
     uint refs;
     char name[MAX_TUBE_NAME_LEN];
+    uint name_size;
     Heap ready;
     Heap delay;
     struct ms waiting; /* set of conns */
@@ -294,7 +295,10 @@ struct Conn {
     job in_job; // a job to be read from the client
 
     job out_job;
+    int tot_data_to_sent;
     int out_job_sent;
+    int out_tubename_sent;
+    int out_extra_sent;
 
     struct ms  watch;
     struct job reserved_jobs; // linked list header

@@ -232,6 +232,8 @@ size_t job_data_size_limit = JOB_DATA_SIZE_LIMIT_DEFAULT;
 
 static char bucket[BUCKET_BUF_SIZE];
 
+static char clrf[2] = "\r\n";
+
 static uint ready_ct = 0;
 static struct stats global_stat = {0, 0, 0, 0, 0};
 
@@ -355,10 +357,16 @@ reply_job(Conn *c, job j, const char *word)
 {
     /* tell this connection which job to send */
     c->out_job = j;
-    c->out_job_sent = 0;
 
-    return reply_line(c, STATE_SENDJOB, "%s %"PRIu64" %u\r\n",
-                      word, j->r.id, j->r.body_size - 2);
+    c->out_job_sent = 0;
+    c->out_tubename_sent = 0;
+    c->out_extra_sent = 0;
+
+    // Tot data to sent
+    c->tot_data_to_sent = c->reply_len + j->r.body_size + j->tube->name_size + 2;
+
+    return reply_line(c, STATE_SENDJOB, "%s %"PRIu64" %u %lu\r\n",
+                      word, j->r.id, j->r.body_size - 2, strlen(j->tube->name));
 }
 
 Conn *
@@ -1698,7 +1706,7 @@ conn_data(Conn *c)
 {
     int r, to_read;
     job j;
-    struct iovec iov[2];
+    struct iovec iov[4];
 
     switch (c->state) {
     case STATE_WANTCOMMAND:
@@ -1784,8 +1792,13 @@ conn_data(Conn *c)
         iov[0].iov_len = c->reply_len - c->reply_sent; /* maybe 0 */
         iov[1].iov_base = j->body + c->out_job_sent;
         iov[1].iov_len = j->r.body_size - c->out_job_sent;
+        iov[2].iov_base = j->tube->name + c->out_tubename_sent;
+        iov[2].iov_len = j->tube->name_size - c->out_tubename_sent;
+        iov[3].iov_base = clrf + c->out_extra_sent;
+        iov[3].iov_len = 2 - c->out_extra_sent;
 
-        r = writev(c->sock.fd, iov, 2);
+        r = writev(c->sock.fd, iov, 4);
+        printf("%d\n", r);
         if (r == -1) return check_err(c, "writev()");
         if (r == 0) {
             c->state = STATE_CLOSE;
@@ -1797,12 +1810,20 @@ conn_data(Conn *c)
         if (c->reply_sent >= c->reply_len) {
             c->out_job_sent += c->reply_sent - c->reply_len;
             c->reply_sent = c->reply_len;
+            if (c->out_job_sent >= j->r.body_size) {
+            	c->out_tubename_sent += c->out_job_sent - j->r.body_size;
+            	c->out_job_sent = j->r.body_size;
+            	if (c->out_tubename_sent >= j->tube->name_size) {
+            		c->out_extra_sent = c->out_tubename_sent - j->tube->name_size;
+            		c->out_tubename_sent = j->tube->name_size;
+            	}
+            }
         }
 
         /* (c->out_job_sent > j->r.body_size) can't happen */
 
         /* are we done? */
-        if (c->out_job_sent == j->r.body_size) {
+        if (c->reply_sent == c->tot_data_to_sent) {
             if (verbose >= 2) {
                 printf(">%d job %"PRIu64"\n", c->sock.fd, j->r.id);
             }
