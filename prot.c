@@ -359,12 +359,10 @@ reply_job(Conn *c, job j, const char *word)
     /* tell this connection which job to send */
     c->out_job = j;
 
+    c->job_sent = 0;
     c->out_job_sent = 0;
     c->out_tubename_sent = 0;
     c->out_extra_sent = 0;
-
-    // Tot data to sent
-    c->tot_data_to_sent = c->reply_len + j->r.body_size + j->tube->name_size + 2;
 
     return reply_line(c, STATE_SENDJOB, "%s %"PRIu64" %u %lu\r\n",
                       word, j->r.id, j->r.body_size - 2, strlen(j->tube->name));
@@ -1053,6 +1051,7 @@ do_stats(Conn *c, fmt_fn fmt, void *data)
     if (r > stats_len) return reply_serr(c, MSG_INTERNAL_ERROR);
 
     c->out_job_sent = 0;
+    c->job_sent = 0;
     return reply_line(c, STATE_SENDJOB, "OK %d\r\n", r - 2);
 }
 
@@ -1067,7 +1066,7 @@ do_list_tubes(Conn *c, ms l)
     resp_z = 6; /* initial "---\n" and final "\r\n" */
     for (i = 0; i < l->used; i++) {
         t = l->items[i];
-        resp_z += 3 + strlen(t->name); /* including "- " and "\n" */
+        resp_z += 3 + t->name_size; /* including "- " and "\n" */
     }
 
     c->out_job = allocate_job(resp_z); /* fake job to hold response data */
@@ -1081,12 +1080,13 @@ do_list_tubes(Conn *c, ms l)
     buf += snprintf(buf, 5, "---\n");
     for (i = 0; i < l->used; i++) {
         t = l->items[i];
-        buf += snprintf(buf, 4 + strlen(t->name), "- %s\n", t->name);
+        buf += snprintf(buf, 4 + t->name_size, "- %s\n", t->name);
     }
     buf[0] = '\r';
     buf[1] = '\n';
 
     c->out_job_sent = 0;
+    c->job_sent = 0;
     return reply_line(c, STATE_SENDJOB, "OK %zu\r\n", resp_z - 2);
 }
 
@@ -1709,7 +1709,7 @@ reset_conn(Conn *c)
 static void
 conn_data(Conn *c)
 {
-    int r, to_read;
+    int r, to_read, iovsize;
     job j;
     struct iovec iov[4];
 
@@ -1797,13 +1797,18 @@ conn_data(Conn *c)
         iov[0].iov_len = c->reply_len - c->reply_sent; /* maybe 0 */
         iov[1].iov_base = j->body + c->out_job_sent;
         iov[1].iov_len = j->r.body_size - c->out_job_sent;
-        iov[2].iov_base = j->tube->name + c->out_tubename_sent;
-        iov[2].iov_len = j->tube->name_size - c->out_tubename_sent;
-        iov[3].iov_base = clrf + c->out_extra_sent;
-        iov[3].iov_len = 2 - c->out_extra_sent;
 
-        r = writev(c->sock.fd, iov, 4);
-        printf("%d\n", r);
+        if (j->tube != NULL) {
+        	iovsize = 4;
+            iov[2].iov_base = j->tube->name + c->out_tubename_sent;
+            iov[2].iov_len = j->tube->name_size - c->out_tubename_sent;
+            iov[3].iov_base = clrf + c->out_extra_sent;
+            iov[3].iov_len = 2 - c->out_extra_sent;
+        } else {
+        	iovsize = 2;
+        }
+
+        r = writev(c->sock.fd, iov, iovsize);
         if (r == -1) return check_err(c, "writev()");
         if (r == 0) {
             c->state = STATE_CLOSE;
@@ -1818,9 +1823,12 @@ conn_data(Conn *c)
             if (c->out_job_sent >= j->r.body_size) {
             	c->out_tubename_sent += c->out_job_sent - j->r.body_size;
             	c->out_job_sent = j->r.body_size;
-            	if (c->out_tubename_sent >= j->tube->name_size) {
+            	if (iovsize == 2) {
+            		c->job_sent = 1;
+            	} else if (c->out_tubename_sent >= j->tube->name_size) {
             		c->out_extra_sent = c->out_tubename_sent - j->tube->name_size;
             		c->out_tubename_sent = j->tube->name_size;
+            		c->job_sent = 1;
             	}
             }
         }
@@ -1828,7 +1836,7 @@ conn_data(Conn *c)
         /* (c->out_job_sent > j->r.body_size) can't happen */
 
         /* are we done? */
-        if (c->reply_sent == c->tot_data_to_sent) {
+        if (c->job_sent) {
             if (verbose >= 2) {
                 printf(">%d job %"PRIu64"\n", c->sock.fd, j->r.id);
             }
