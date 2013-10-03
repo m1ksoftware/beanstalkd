@@ -170,6 +170,7 @@ size_t job_data_size_limit = JOB_DATA_SIZE_LIMIT_DEFAULT;
     "cmd-list-tube-used: %" PRIu64 "\n" \
     "cmd-list-tubes-watched: %" PRIu64 "\n" \
     "cmd-pause-tube: %" PRIu64 "\n" \
+    "cmd-clear-tube: %" PRIu64 "\n" \
     "job-timeouts: %" PRIu64 "\n" \
     "total-jobs: %" PRIu64 "\n" \
     "max-job-size: %zu\n" \
@@ -926,6 +927,7 @@ fmt_stats(char *buf, size_t size, void *x)
             op_ct[OP_LIST_TUBE_USED],
             op_ct[OP_LIST_TUBES_WATCHED],
             op_ct[OP_PAUSE_TUBE],
+            op_ct[OP_CLEAR_TUBE],
             timeout_ct,
             global_stat.total_jobs_ct,
             job_data_size_limit,
@@ -1619,6 +1621,9 @@ dispatch_cmd(Conn *c)
     	if (!t) return reply_msg(c, MSG_NOTFOUND);
 
     	tube_clear(t);
+
+    	op_ct[type]++;
+
     	reply_msg(c,  MSG_CLEARED);
 
     	t = NULL;
